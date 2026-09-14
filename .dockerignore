@@ -3,11 +3,6 @@ node_modules
 dist
 .output
 
-# Ignore mobile native source and builds
-android
-*.apk
-*.aab
-
 # Ignore version control and IDE settings
 .git
 .gitignore

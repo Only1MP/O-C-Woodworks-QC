@@ -5,11 +5,9 @@ import {
   Trash2, 
   Plus, 
   Minus, 
-  SlidersHorizontal,
-  Sun,
-  Moon,
-  CheckCircle2,
-  AlertCircle,
+  Sun, 
+  Moon, 
+  CheckCircle2, 
   RotateCcw
 } from 'lucide-react';
 import { ProductionLineState, ShiftAssignments } from '../types';

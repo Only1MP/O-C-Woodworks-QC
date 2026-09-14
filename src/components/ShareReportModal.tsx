@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { QCDefectLog, STANDARD_PARTS, DEFECT_TYPES_LIST } from '../types';
-import { Mail, Download, Clipboard, Check, X, ArrowRight, Sparkles } from 'lucide-react';
+import { Mail, Download, Clipboard, Check, X, ArrowRight } from 'lucide-react';
 
 interface ShareReportModalProps {
   isOpen: boolean;

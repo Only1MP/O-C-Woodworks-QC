@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { QCDefectLog, STANDARD_PARTS, DEFECT_TYPES_LIST } from '../types';
-import { Search, Trash2, Download, Calendar, Eye, FileSpreadsheet, Layers, Clock, AlertTriangle, Mail, Share2 } from 'lucide-react';
+import { Search, Trash2, Download, Calendar, Eye, FileSpreadsheet, Layers, Clock, Mail } from 'lucide-react';
 
 interface DefectHistoryProps {
   logs: QCDefectLog[];

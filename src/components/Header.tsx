@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, ClipboardList, User, Layers } from 'lucide-react';
+import { Calendar, User, Layers } from 'lucide-react';
 
 interface HeaderProps {
   date: string;

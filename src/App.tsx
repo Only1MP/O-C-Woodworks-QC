@@ -9,13 +9,7 @@ import {
   History, 
   Save, 
   FileText, 
-  CheckCircle, 
-  Sparkles, 
-  RefreshCw, 
-  ChevronRight, 
   Share2, 
-  Play,
-  Mail,
   Users
 } from 'lucide-react';
 import ProductionForce from './components/ProductionForce';
