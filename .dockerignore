@@ -26,7 +26,6 @@ yarn-error.log*
 .env.development
 .env.test
 .env.production
-!.env.example
 
 # Ignore non-essential assets
 assets
