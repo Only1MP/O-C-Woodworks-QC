@@ -1,0 +1,21 @@
+services:
+  qc-defect-log:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: daily-qc-defect-log:latest
+    container_name: daily-qc-defect-log
+    restart: unless-stopped
+    ports:
+      # Map host port 3000 to container port 80 (customizable via HOST_PORT env var)
+      - "${HOST_PORT:-3000}:80"
+    environment:
+      - PORT=80
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:80/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    labels:
+      - "com.woodshop.qc.app=daily-qc-defect-log"

@@ -1,0 +1,8 @@
+{
+  "name": "Remix Daily QC Defect Log",
+  "description": "A high-fidelity digital Quality Control Defect Log to record defects by part and damage type, calculate real-time tallies, and manage log histories.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
