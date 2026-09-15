@@ -13,8 +13,8 @@ WORKDIR /app
 # Copy dependency specifications first to leverage Docker layer caching
 COPY package.json package-lock.json ./
 
-# Install clean dependencies for build
-RUN npm ci --prefer-offline --no-audit
+# Install dependencies (fallback to npm install if package-lock is out of sync)
+RUN npm ci --prefer-offline --no-audit || npm install --no-audit
 
 # Copy application source code and build configs
 COPY index.html tsconfig.json vite.config.ts ./
