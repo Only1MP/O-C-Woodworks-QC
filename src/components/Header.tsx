@@ -32,10 +32,21 @@ export default function Header({
       {/* Visual Woodgrain Accent Panel */}
       <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-brand-beige-800 via-brand-beige-300 to-brand-forest-600"></div>
 
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 tracking-tight font-sans">
-          Daily QC Defect Log
-        </h1>
+      <div className="mb-6 flex items-center gap-3">
+        <img 
+          src="/thumbnail.png" 
+          alt="Olive & Cocoa Logo" 
+          className="w-12 h-12 rounded-xl border border-brand-beige-200 shadow-xs object-cover bg-brand-beige-50 shrink-0" 
+          referrerPolicy="no-referrer"
+        />
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight font-sans">
+            Daily QC Defect Log
+          </h1>
+          <p className="text-xs text-gray-500 font-medium">
+            Woodshop Inspection &amp; Real-time Damage Audit
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

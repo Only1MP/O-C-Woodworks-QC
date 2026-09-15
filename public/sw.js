@@ -1,9 +1,12 @@
-const CACHE_NAME = 'qc-defect-log-v1';
+const CACHE_NAME = 'qc-defect-log-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/icon.svg'
+  '/icon.svg',
+  '/thumbnail.png',
+  '/icon-192.png',
+  '/icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {

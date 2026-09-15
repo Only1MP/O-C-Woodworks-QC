@@ -328,9 +328,12 @@ export default function App() {
             
             {/* Left side brand banner logo */}
             <div className="flex items-center gap-2.5 mt-1 sm:mt-0">
-              <div className="p-1.5 bg-brand-forest-500 text-white rounded-md shadow-xs">
-                <Clipboard className="w-5 h-5 animate-pulse" />
-              </div>
+              <img 
+                src="/thumbnail.png" 
+                alt="Olive & Cocoa Emblem" 
+                className="w-9 h-9 rounded-lg border border-brand-beige-300/40 shadow-xs object-cover bg-brand-beige-50 shrink-0" 
+                referrerPolicy="no-referrer"
+              />
               <div className="flex flex-col">
                 <span className="font-mono text-[10px] text-brand-beige-300 font-semibold leading-none tracking-wider uppercase">
                   Daily QC Log Ledger
