@@ -22,6 +22,7 @@ COPY src/ ./src/
 COPY public/ ./public/
 
 # Compile production Vite bundle into /app/dist
+RUN npm install @rollup/rollup-linux-arm64-musl lightningcss-linux-arm64-musl @tailwindcss/oxide-linux-arm64-musl
 RUN npm run build
 
 # --------------------------------------------------------
