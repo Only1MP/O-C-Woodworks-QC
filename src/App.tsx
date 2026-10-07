@@ -5,6 +5,7 @@ import DefectMatrixTable from './components/DefectMatrixTable';
 import DefectHistory from './components/DefectHistory';
 import ShareReportModal from './components/ShareReportModal';
 import { AuthModal } from './components/AuthModal';
+import { LoginScreen } from './components/LoginScreen';
 import { qcApi, AuthUser, PublicUser } from './services/api';
 import { 
   Clipboard, 
@@ -20,7 +21,8 @@ import {
   RotateCcw,
   CheckCircle,
   X,
-  Mail
+  Mail,
+  LogOut
 } from 'lucide-react';
 import ProductionForce from './components/ProductionForce';
 
@@ -35,6 +37,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [publicUsers, setPublicUsers] = useState<PublicUser[]>([]);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
 
   // Production force state
   const [productionForce, setProductionForce] = useState<ProductionLineState>({
@@ -183,6 +186,8 @@ export default function App() {
           const localStaff = localStorage.getItem('shop_pulse_production_force');
           if (localStaff) setProductionForce(JSON.parse(localStaff));
         } catch (_) {}
+      } finally {
+        setIsAuthChecking(false);
       }
     }
 
@@ -409,6 +414,34 @@ export default function App() {
     showNotification('info', 'Grid retained without archiving.');
   };
 
+  const handleLogout = async () => {
+    await qcApi.logout();
+    setCurrentUser(null);
+    showNotification('info', 'Signed out.');
+  };
+
+  // If initial auth check is in flight, show clean minimal loader
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen bg-brand-beige-100 flex items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-3">
+          <img
+            src="/thumbnail.png"
+            alt="Olive & Cocoa Logo"
+            className="w-14 h-14 rounded-2xl border border-brand-beige-300 shadow-xs object-cover bg-white animate-pulse"
+            referrerPolicy="no-referrer"
+          />
+          <div className="w-5 h-5 border-2 border-brand-forest-600 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // If user is not authenticated, show LoginScreen
+  if (!currentUser) {
+    return <LoginScreen onSuccess={handleUserChanged} />;
+  }
+
   return (
     <div className="min-h-screen bg-brand-beige-50 pb-12 font-sans selection:bg-brand-forest-500/20 antialiased text-brand-charcoal-800">
       
@@ -490,28 +523,25 @@ export default function App() {
                 <span>Audits ({logs.length})</span>
               </button>
 
-              {/* User Account / Sign In Pill */}
-              <button
-                onClick={() => setIsAuthModalOpen(true)}
-                className={`flex items-center gap-1.5 text-[11px] sm:text-xs font-semibold px-3 py-2 sm:py-2.5 rounded-lg transition-all border ${
-                  currentUser
-                    ? 'bg-brand-forest-800 text-emerald-300 border-emerald-500/30 hover:bg-brand-forest-900'
-                    : 'bg-white/10 text-brand-beige-200 border-white/20 hover:bg-white/20'
-                }`}
-                title="Manage User Account & Authentication"
-              >
-                {currentUser ? (
-                  <>
-                    <Shield className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="max-w-[100px] truncate">{currentUser.displayName}</span>
-                  </>
-                ) : (
-                  <>
-                    <User className="w-3.5 h-3.5" />
-                    <span>Sign In</span>
-                  </>
-                )}
-              </button>
+              {/* User Account / Switch / Sign Out */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="flex items-center gap-1.5 text-[11px] sm:text-xs font-semibold px-3 py-2 sm:py-2.5 rounded-lg transition-all border bg-brand-forest-800 text-emerald-300 border-emerald-500/30 hover:bg-brand-forest-900 cursor-pointer"
+                  title="Switch User or Manage Accounts"
+                >
+                  <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="max-w-[110px] truncate">{currentUser.displayName}</span>
+                </button>
+
+                <button
+                  onClick={handleLogout}
+                  className="p-2 sm:py-2.5 sm:px-2.5 rounded-lg text-brand-beige-200 hover:text-white hover:bg-brand-forest-600 transition-colors border border-transparent hover:border-white/10 cursor-pointer"
+                  title="Sign Out"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
           </div>

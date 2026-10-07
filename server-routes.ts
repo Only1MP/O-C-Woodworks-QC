@@ -159,6 +159,56 @@ export function createApiRouter(): express.Router {
     res.json({ success: true, message: 'Logged out successfully.' });
   });
 
+  // Register new account (public signup)
+  router.post('/auth/register', (req: Request, res: Response) => {
+    const { username, password } = req.body;
+    if (!username || typeof username !== 'string' || !username.trim()) {
+      return res.status(400).json({ error: 'Username is required.' });
+    }
+    if (!password || typeof password !== 'string' || password.trim().length < 3) {
+      return res.status(400).json({ error: 'Password must be at least 3 characters.' });
+    }
+
+    const trimmedUser = username.trim();
+    const existing = db.findUserByUsername(trimmedUser);
+    if (existing) {
+      return res.status(400).json({ error: 'That username is already taken.' });
+    }
+
+    try {
+      const newUser = db.createUser({
+        username: trimmedUser,
+        displayName: trimmedUser,
+        pin: password.trim(),
+        role: 'inspector'
+      });
+
+      const payload = {
+        id: newUser.id,
+        username: newUser.username,
+        displayName: newUser.displayName,
+        role: newUser.role
+      };
+
+      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' });
+
+      res.cookie(COOKIE_NAME, token, {
+        httpOnly: true,
+        secure: false,
+        sameSite: 'lax',
+        maxAge: 30 * 24 * 60 * 60 * 1000
+      });
+
+      res.json({
+        success: true,
+        token,
+        user: payload
+      });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message || 'Failed to create user.' });
+    }
+  });
+
   // Create new user account (Admin only, or initial setup)
   router.post('/auth/create-user', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
     if (req.user?.role !== 'admin') {

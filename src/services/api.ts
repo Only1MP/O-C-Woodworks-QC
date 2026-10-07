@@ -89,6 +89,15 @@ export const qcApi = {
     return data.user;
   },
 
+  async register(username: string, password: string): Promise<AuthUser> {
+    const data = await apiRequest<{ success: boolean; token: string; user: AuthUser }>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ username, password })
+    });
+    setStoredToken(data.token);
+    return data.user;
+  },
+
   async logout(): Promise<void> {
     try {
       await apiRequest('/auth/logout', { method: 'POST' });
