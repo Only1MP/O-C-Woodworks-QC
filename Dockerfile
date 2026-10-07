@@ -4,7 +4,7 @@
 # ========================================================
 
 # --------------------------------------------------------
-# Stage 1: Build static frontend assets
+# Stage 1: Build static frontend assets and bundle server
 # --------------------------------------------------------
 FROM node:22-alpine AS builder
 
@@ -13,27 +13,30 @@ WORKDIR /app
 # Copy dependency specifications first to leverage Docker layer caching
 COPY package.json package-lock.json* ./
 
+# Explicitly ensure native build packages are present for alpine arm64
+RUN npm install @rollup/rollup-linux-arm64-musl lightningcss-linux-arm64-musl @tailwindcss/oxide-linux-arm64-musl || true
+
 # Install dependencies
 RUN npm ci --prefer-offline --no-audit || npm install --no-audit
 
-# Copy application source code and build configs
-COPY index.html tsconfig.json vite.config.ts ./
+# Copy application source code and configs
+COPY index.html tsconfig.json vite.config.ts server.ts server-routes.ts server-db.ts ./
 COPY src/ ./src/
 COPY public/ ./public/
 
-# Compile production Vite bundle into /app/dist
-RUN npm install @rollup/rollup-linux-arm64-musl lightningcss-linux-arm64-musl @tailwindcss/oxide-linux-arm64-musl || true
+# Compile frontend into /app/dist and backend into /app/server.mjs
 RUN npm run build
 
 # --------------------------------------------------------
-# Stage 2: Lightweight Node Production Server with Embedded Database
+# Stage 2: Ultra-lightweight Node Production Server
+# No Rollup, no Vite, no TypeScript compiler needed at runtime!
 # --------------------------------------------------------
 FROM node:22-alpine AS runner
 
 WORKDIR /app
 
 LABEL maintainer="Woodshop QC Team"
-LABEL description="Full-stack container for Daily QC Defect Log with embedded server database"
+LABEL description="Full-stack production container for Daily QC Defect Log"
 
 ENV PORT=80
 ENV NODE_ENV=production
@@ -43,17 +46,13 @@ ENV DATABASE_PATH=/app/data/qc_store.json
 # Copy production package specifications
 COPY package.json package-lock.json* ./
 
-# Install production dependencies only
-RUN npm ci --omit=dev --no-audit || npm install --omit=dev --no-audit
+# Install only production dependencies (express, bcryptjs, cookie-parser, jsonwebtoken)
+# No devDependencies (vite, rollup, tsx) are needed at runtime
+RUN npm install --omit=dev --no-audit
 
-# Install tsx globally or locally for executing server.ts directly on Node Alpine
-RUN npm install -g tsx
-
-# Copy compiled frontend dist from builder stage
+# Copy compiled frontend and compiled server from builder stage
 COPY --from=builder /app/dist /app/dist
-
-# Copy backend server scripts
-COPY server.ts server-routes.ts server-db.ts ./
+COPY --from=builder /app/server.mjs /app/server.mjs
 
 # Create data directory for volume mount
 RUN mkdir -p /app/data
@@ -65,5 +64,5 @@ EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:${PORT}/healthz || exit 1
 
-# Launch the unified server
-CMD ["tsx", "server.ts"]
+# Run compiled Node.js server directly
+CMD ["node", "server.mjs"]

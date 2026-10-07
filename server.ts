@@ -1,7 +1,6 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { createServer as createViteServer } from 'vite';
 import { createApiRouter } from './server-routes';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -21,7 +20,8 @@ async function startServer() {
   });
 
   if (!isProduction) {
-    // Development Mode: Mount Vite's connect middleware to serve HMR / React SPA
+    // Development Mode: Dynamically import Vite only when running dev server
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
