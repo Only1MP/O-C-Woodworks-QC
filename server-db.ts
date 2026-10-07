@@ -49,19 +49,6 @@ interface DatabaseSchema {
   };
 }
 
-const DEFAULT_EMPLOYEES = [
-  'Juan S.',
-  'Marcus T.',
-  'Elena R.',
-  'Dave K.',
-  'Sofia M.',
-  'Carlos H.',
-  'Rachel B.',
-  'Tyler W.',
-  'Devon L.',
-  'Aria P.'
-];
-
 class DatabaseEngine {
   private filePath: string;
   private data: DatabaseSchema;
@@ -91,56 +78,24 @@ class DatabaseEngine {
       }
     }
 
-    // Default Seed Accounts:
-    // admin / PIN: 1234
-    // inspector / PIN: 0000
-    // lead / PIN: 4321
-    const salt = bcrypt.genSaltSync(10);
-    const initialUsers: UserAccount[] = [
-      {
-        id: 'usr_admin',
-        username: 'admin',
-        displayName: 'Shop Administrator',
-        pinHash: bcrypt.hashSync('1234', salt),
-        role: 'admin',
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: 'usr_lead',
-        username: 'lead',
-        displayName: 'QC Lead',
-        pinHash: bcrypt.hashSync('4321', salt),
-        role: 'lead',
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: 'usr_inspector',
-        username: 'inspector',
-        displayName: 'Floor Inspector',
-        pinHash: bcrypt.hashSync('0000', salt),
-        role: 'inspector',
-        createdAt: new Date().toISOString()
-      }
-    ];
-
     const initialStaff: StaffData = {
-      employees: DEFAULT_EMPLOYEES,
+      employees: [],
       morning: {
-        Sides: ['Juan S.', 'Marcus T.'],
-        Crates: ['Elena R.'],
-        Bottoms: ['Dave K.', 'Sofia M.'],
-        Lids: ['Carlos H.']
+        Sides: ['', ''],
+        Crates: ['', ''],
+        Bottoms: ['', ''],
+        Lids: ['', '']
       },
       afternoon: {
-        Sides: ['Rachel B.'],
-        Crates: ['Tyler W.', 'Devon L.'],
-        Bottoms: ['Aria P.'],
-        Lids: ['Juan S.']
+        Sides: ['', ''],
+        Crates: ['', ''],
+        Bottoms: ['', ''],
+        Lids: ['', '']
       }
     };
 
     const initialData: DatabaseSchema = {
-      users: initialUsers,
+      users: [],
       logs: [],
       staff: initialStaff,
       settings: {
@@ -159,7 +114,7 @@ class DatabaseEngine {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
-      // Atomic write using a temp file to prevent corruption on abrupt Raspberry Pi power loss
+      // Atomic write using a temp file to prevent database corruption on unexpected power loss
       const tempPath = `${this.filePath}.tmp.${Date.now()}`;
       fs.writeFileSync(tempPath, JSON.stringify(dataToSave, null, 2), 'utf-8');
       fs.renameSync(tempPath, this.filePath);

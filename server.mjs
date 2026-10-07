@@ -15,18 +15,6 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 import path from "path";
 import bcrypt from "bcryptjs";
-var DEFAULT_EMPLOYEES = [
-  "Juan S.",
-  "Marcus T.",
-  "Elena R.",
-  "Dave K.",
-  "Sofia M.",
-  "Carlos H.",
-  "Rachel B.",
-  "Tyler W.",
-  "Devon L.",
-  "Aria P."
-];
 var DatabaseEngine = class {
   constructor() {
     const dbDir = process.env.DATA_DIR || path.resolve(process.cwd(), "data");
@@ -49,50 +37,23 @@ var DatabaseEngine = class {
         console.error("Error loading database file, initializing defaults:", err);
       }
     }
-    const salt = bcrypt.genSaltSync(10);
-    const initialUsers = [
-      {
-        id: "usr_admin",
-        username: "admin",
-        displayName: "Shop Administrator",
-        pinHash: bcrypt.hashSync("1234", salt),
-        role: "admin",
-        createdAt: (/* @__PURE__ */ new Date()).toISOString()
-      },
-      {
-        id: "usr_lead",
-        username: "lead",
-        displayName: "QC Lead",
-        pinHash: bcrypt.hashSync("4321", salt),
-        role: "lead",
-        createdAt: (/* @__PURE__ */ new Date()).toISOString()
-      },
-      {
-        id: "usr_inspector",
-        username: "inspector",
-        displayName: "Floor Inspector",
-        pinHash: bcrypt.hashSync("0000", salt),
-        role: "inspector",
-        createdAt: (/* @__PURE__ */ new Date()).toISOString()
-      }
-    ];
     const initialStaff = {
-      employees: DEFAULT_EMPLOYEES,
+      employees: [],
       morning: {
-        Sides: ["Juan S.", "Marcus T."],
-        Crates: ["Elena R."],
-        Bottoms: ["Dave K.", "Sofia M."],
-        Lids: ["Carlos H."]
+        Sides: ["", ""],
+        Crates: ["", ""],
+        Bottoms: ["", ""],
+        Lids: ["", ""]
       },
       afternoon: {
-        Sides: ["Rachel B."],
-        Crates: ["Tyler W.", "Devon L."],
-        Bottoms: ["Aria P."],
-        Lids: ["Juan S."]
+        Sides: ["", ""],
+        Crates: ["", ""],
+        Bottoms: ["", ""],
+        Lids: ["", ""]
       }
     };
     const initialData = {
-      users: initialUsers,
+      users: [],
       logs: [],
       staff: initialStaff,
       settings: {
@@ -329,6 +290,48 @@ function createApiRouter() {
   router.post("/auth/logout", (_req, res) => {
     res.clearCookie(COOKIE_NAME);
     res.json({ success: true, message: "Logged out successfully." });
+  });
+  router.post("/auth/register", (req, res) => {
+    const { username, password } = req.body;
+    if (!username || typeof username !== "string" || !username.trim()) {
+      return res.status(400).json({ error: "Username is required." });
+    }
+    if (!password || typeof password !== "string" || password.trim().length < 3) {
+      return res.status(400).json({ error: "Password must be at least 3 characters." });
+    }
+    const trimmedUser = username.trim();
+    const existing = db.findUserByUsername(trimmedUser);
+    if (existing) {
+      return res.status(400).json({ error: "That username is already taken." });
+    }
+    try {
+      const newUser = db.createUser({
+        username: trimmedUser,
+        displayName: trimmedUser,
+        pin: password.trim(),
+        role: "inspector"
+      });
+      const payload = {
+        id: newUser.id,
+        username: newUser.username,
+        displayName: newUser.displayName,
+        role: newUser.role
+      };
+      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "30d" });
+      res.cookie(COOKIE_NAME, token, {
+        httpOnly: true,
+        secure: false,
+        sameSite: "lax",
+        maxAge: 30 * 24 * 60 * 60 * 1e3
+      });
+      res.json({
+        success: true,
+        token,
+        user: payload
+      });
+    } catch (err) {
+      res.status(400).json({ error: err.message || "Failed to create user." });
+    }
   });
   router.post("/auth/create-user", authMiddleware, (req, res) => {
     if (req.user?.role !== "admin") {

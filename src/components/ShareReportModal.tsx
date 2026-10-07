@@ -282,7 +282,7 @@ export default function ShareReportModal({
                   type="email"
                   value={recipient}
                   onChange={(e) => setRecipient(e.target.value)}
-                  placeholder="e.g. supervisor@company.com"
+                  placeholder="recipient@example.com"
                   className="w-full text-xs font-medium px-3 py-2.5 bg-brand-beige-50 hover:bg-white border border-brand-beige-200 rounded-lg outline-hidden focus:border-brand-forest-500 transition-all font-mono"
                 />
               </div>

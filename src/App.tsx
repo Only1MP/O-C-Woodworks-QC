@@ -4,9 +4,8 @@ import Header from './components/Header';
 import DefectMatrixTable from './components/DefectMatrixTable';
 import DefectHistory from './components/DefectHistory';
 import ShareReportModal from './components/ShareReportModal';
-import { AuthModal } from './components/AuthModal';
 import { LoginScreen } from './components/LoginScreen';
-import { qcApi, AuthUser, PublicUser } from './services/api';
+import { qcApi, AuthUser } from './services/api';
 import { 
   Clipboard, 
   History, 
@@ -16,7 +15,6 @@ import {
   Users,
   User,
   Shield,
-  Server,
   Archive,
   RotateCcw,
   CheckCircle,
@@ -35,8 +33,6 @@ export default function App() {
 
   // Auth state
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
-  const [publicUsers, setPublicUsers] = useState<PublicUser[]>([]);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
 
   // Production force state
@@ -122,17 +118,7 @@ export default function App() {
     }, 4500);
   }, []);
 
-  // Refresh user directory list
-  const refreshUsers = useCallback(async () => {
-    try {
-      const users = await qcApi.getPublicUsers();
-      setPublicUsers(users);
-    } catch (err) {
-      console.warn('Failed to fetch public users list', err);
-    }
-  }, []);
-
-  // Initial sync: fetch currentUser, publicUsers, logs, and staff roster
+  // Initial sync: fetch currentUser, logs, and staff roster
   useEffect(() => {
     async function initData() {
       try {
@@ -144,10 +130,7 @@ export default function App() {
           setShiftReportedBy((prev) => prev || user.displayName);
         }
 
-        // 2. Fetch public user accounts
-        await refreshUsers();
-
-        // 3. Fetch server logs
+        // 2. Fetch server logs
         const serverLogs = await qcApi.getLogs();
         if (Array.isArray(serverLogs) && serverLogs.length > 0) {
           setLogs(serverLogs);
@@ -192,7 +175,7 @@ export default function App() {
     }
 
     initData();
-  }, [refreshUsers]);
+  }, []);
 
   // When currentUser changes, sync inspector field if appropriate
   const handleUserChanged = (user: AuthUser | null) => {
@@ -317,16 +300,16 @@ export default function App() {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedLogs));
     } catch (_) {}
 
-    // Save to Raspberry Pi Server Database
+    // Save to Database
     try {
       await qcApi.saveLog(newLog);
       setIsServerSynced(true);
       showNotification(
         'success',
-        `Log for SKU ${newLog.sku} saved to Raspberry Pi Database! (${grandTotal} defects)`
+        `Log for SKU ${newLog.sku} saved successfully. (${grandTotal} defects)`
       );
     } catch (err: any) {
-      console.warn('Server database save error, preserved locally:', err);
+      console.warn('Database save error, preserved locally:', err);
       showNotification(
         'info',
         `Log saved locally (${grandTotal} defects). Will sync when server is reachable.`
@@ -456,38 +439,35 @@ export default function App() {
         </div>
       )}
 
-      {/* Primary Brand Navigation Rail */}
-      <nav className="bg-brand-forest-700 text-white shadow-md relative z-10 py-2 sm:py-0">
+      {/* Primary Brand Navigation Header (Optimized for Mobile & Desktop) */}
+      <nav className="bg-brand-forest-700 text-white shadow-md sticky top-0 z-40 border-b border-brand-forest-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:h-16">
+          <div className="flex items-center justify-between h-14 sm:h-16">
             
-            {/* Left side brand banner logo */}
-            <div className="flex items-center gap-2.5 mt-1 sm:mt-0">
+            {/* Brand Logo & Title */}
+            <div className="flex items-center gap-2.5 min-w-0">
               <img 
                 src="/thumbnail.png" 
                 alt="Olive & Cocoa Emblem" 
-                className="w-9 h-9 rounded-lg border border-brand-beige-300/40 shadow-xs object-cover bg-brand-beige-50 shrink-0" 
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg border border-brand-beige-300/40 shadow-xs object-cover bg-brand-beige-50 shrink-0" 
                 referrerPolicy="no-referrer"
               />
-              <div className="flex flex-col">
-                <span className="font-mono text-[10px] text-brand-beige-300 font-semibold leading-none tracking-wider uppercase flex items-center gap-1.5">
-                  Daily QC Log Ledger
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-black/20 text-[9px] text-emerald-300 font-mono" title="Connected to Server Database">
-                    <Server className="w-2.5 h-2.5" /> Pi DB
-                  </span>
+              <div className="flex flex-col min-w-0">
+                <span className="font-mono text-[9px] sm:text-[10px] text-brand-beige-300 font-semibold leading-none tracking-wider uppercase truncate">
+                  Daily QC Log
                 </span>
-                <span className="text-xs sm:text-sm font-bold tracking-tight text-white leading-tight">
+                <span className="text-xs sm:text-sm font-bold tracking-tight text-white leading-tight truncate">
                   ShopPulse • Olive &amp; Cocoa
                 </span>
               </div>
             </div>
 
-            {/* Navigation Tabs */}
-            <div className="flex items-center gap-1 sm:gap-1.5 w-full sm:w-auto justify-center">
+            {/* Desktop Navigation Tabs (Hidden on mobile, persistent at bottom instead) */}
+            <div className="hidden md:flex items-center gap-1 sm:gap-1.5">
               <button
-                id="tab-tally"
+                id="tab-tally-desktop"
                 onClick={() => setActiveTab('tally')}
-                className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 text-[11px] sm:text-xs font-semibold px-3 py-2 sm:py-2.5 rounded-lg transition-all ${
+                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg transition-all ${
                   activeTab === 'tally'
                     ? 'bg-brand-forest-500 text-white shadow-xs'
                     : 'text-brand-beige-100 hover:bg-brand-forest-600/50 hover:text-white'
@@ -498,9 +478,9 @@ export default function App() {
               </button>
 
               <button
-                id="tab-positions"
+                id="tab-positions-desktop"
                 onClick={() => setActiveTab('positions')}
-                className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 text-[11px] sm:text-xs font-semibold px-3 py-2 sm:py-2.5 rounded-lg transition-all ${
+                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg transition-all ${
                   activeTab === 'positions'
                     ? 'bg-brand-forest-500 text-white shadow-xs'
                     : 'text-brand-beige-100 hover:bg-brand-forest-600/50 hover:text-white'
@@ -511,9 +491,9 @@ export default function App() {
               </button>
 
               <button
-                id="tab-history"
+                id="tab-history-desktop"
                 onClick={() => setActiveTab('history')}
-                className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 text-[11px] sm:text-xs font-semibold px-3 py-2 sm:py-2.5 rounded-lg transition-all ${
+                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg transition-all ${
                   activeTab === 'history'
                     ? 'bg-brand-forest-500 text-white shadow-xs'
                     : 'text-brand-beige-100 hover:bg-brand-forest-600/50 hover:text-white'
@@ -522,26 +502,23 @@ export default function App() {
                 <History className="w-3.5 h-3.5" />
                 <span>Audits ({logs.length})</span>
               </button>
+            </div>
 
-              {/* User Account / Switch / Sign Out */}
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => setIsAuthModalOpen(true)}
-                  className="flex items-center gap-1.5 text-[11px] sm:text-xs font-semibold px-3 py-2 sm:py-2.5 rounded-lg transition-all border bg-brand-forest-800 text-emerald-300 border-emerald-500/30 hover:bg-brand-forest-900 cursor-pointer"
-                  title="Switch User or Manage Accounts"
-                >
-                  <Shield className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="max-w-[110px] truncate">{currentUser.displayName}</span>
-                </button>
-
-                <button
-                  onClick={handleLogout}
-                  className="p-2 sm:py-2.5 sm:px-2.5 rounded-lg text-brand-beige-200 hover:text-white hover:bg-brand-forest-600 transition-colors border border-transparent hover:border-white/10 cursor-pointer"
-                  title="Sign Out"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                </button>
+            {/* User Badge & Sign Out (Compact & touch-friendly on mobile) */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              <div className="flex items-center gap-1 text-[11px] sm:text-xs font-semibold px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg border bg-brand-forest-800 text-emerald-300 border-emerald-500/30 max-w-[130px] sm:max-w-[160px]">
+                <User className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400 shrink-0" />
+                <span className="truncate">{currentUser.displayName}</span>
               </div>
+
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1 text-[11px] sm:text-xs font-medium text-brand-beige-200 hover:text-white px-2 py-1 sm:py-1.5 rounded-lg hover:bg-brand-forest-600 transition-colors cursor-pointer"
+                title="Sign Out"
+              >
+                <LogOut className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden sm:inline">Sign Out</span>
+              </button>
             </div>
 
           </div>
@@ -549,7 +526,7 @@ export default function App() {
       </nav>
 
       {/* Main Content Workspace viewport */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 sm:mt-6 pb-20 md:pb-6">
         
         {activeTab === 'tally' && (
           <div className="flex flex-col gap-6">
@@ -703,15 +680,59 @@ export default function App() {
         </div>
       )}
 
-      {/* User Accounts & PIN Auth Modal */}
-      <AuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        currentUser={currentUser}
-        publicUsers={publicUsers}
-        onUserChanged={handleUserChanged}
-        onUsersRefreshed={refreshUsers}
-      />
+      {/* Persistent Mobile Bottom Navigation Bar (Hidden on desktop md:) */}
+      <nav 
+        aria-label="Mobile Navigation"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-brand-beige-200 shadow-lg px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+      >
+        <div className="grid grid-cols-3 gap-1">
+          <button
+            id="tab-tally-mobile"
+            onClick={() => setActiveTab('tally')}
+            className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-xl transition-all cursor-pointer ${
+              activeTab === 'tally'
+                ? 'bg-brand-forest-50 text-brand-forest-700 font-bold'
+                : 'text-gray-500 hover:text-gray-900 font-medium'
+            }`}
+          >
+            <Clipboard className="w-5 h-5 mb-0.5 shrink-0" />
+            <span className="text-[10px] tracking-tight leading-none">Entry Sheet</span>
+          </button>
+
+          <button
+            id="tab-positions-mobile"
+            onClick={() => setActiveTab('positions')}
+            className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-xl transition-all cursor-pointer ${
+              activeTab === 'positions'
+                ? 'bg-brand-forest-50 text-brand-forest-700 font-bold'
+                : 'text-gray-500 hover:text-gray-900 font-medium'
+            }`}
+          >
+            <Users className="w-5 h-5 mb-0.5 shrink-0" />
+            <span className="text-[10px] tracking-tight leading-none">Positions</span>
+          </button>
+
+          <button
+            id="tab-history-mobile"
+            onClick={() => setActiveTab('history')}
+            className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-xl transition-all cursor-pointer ${
+              activeTab === 'history'
+                ? 'bg-brand-forest-50 text-brand-forest-700 font-bold'
+                : 'text-gray-500 hover:text-gray-900 font-medium'
+            }`}
+          >
+            <div className="relative">
+              <History className="w-5 h-5 mb-0.5 shrink-0" />
+              {logs.length > 0 && (
+                <span className="absolute -top-1 -right-2.5 px-1 py-0.2 bg-brand-forest-600 text-white rounded-full text-[8px] font-mono leading-none">
+                  {logs.length}
+                </span>
+              )}
+            </div>
+            <span className="text-[10px] tracking-tight leading-none">Audits</span>
+          </button>
+        </div>
+      </nav>
 
     </div>
   );

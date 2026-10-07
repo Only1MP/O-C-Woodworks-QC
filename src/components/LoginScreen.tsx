@@ -108,14 +108,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
 
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                {mode === 'login' ? 'Username' : 'Username / Your Name'}
+                Username
               </label>
               <div className="relative">
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder={mode === 'login' ? 'Enter username' : 'e.g. Mike Price'}
+                  placeholder="Username"
                   autoComplete="username"
                   required
                   className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-brand-beige-200 bg-brand-beige-50/50 hover:bg-white focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-brand-forest-500 text-sm text-gray-900 placeholder:text-gray-400 transition-all"
@@ -133,7 +133,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter password"
+                  placeholder="Password"
                   autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                   required
                   className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-brand-beige-200 bg-brand-beige-50/50 hover:bg-white focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-brand-forest-500 text-sm text-gray-900 placeholder:text-gray-400 transition-all font-mono"

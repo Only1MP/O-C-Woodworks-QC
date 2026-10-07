@@ -10,15 +10,6 @@ interface HeaderProps {
   setShiftReportedBy: (name: string) => void;
 }
 
-const COMMON_SKUS = [
-  'OC-BOX-AMORE',
-  'OC-TRAY-RUSTIC',
-  'OC-CRATE-GOURMET',
-  'OC-BOARD-CHARCUTERIE',
-  'OC- planter-SUCCULENT',
-  'OC-FRAME-RECLAIMED'
-];
-
 export default function Header({
   date,
   setDate,
@@ -79,7 +70,7 @@ export default function Header({
               type="text"
               value={sku}
               onChange={(e) => setSku(e.target.value.toUpperCase())}
-              placeholder="e.g. OC-BOX-AMORE"
+              placeholder="Enter SKU"
               className="w-full bg-brand-beige-50 hover:bg-white text-gray-800 text-sm font-medium border border-brand-beige-200 rounded-lg px-3 py-2.5 outline-hidden focus:border-brand-forest-500 focus:ring-1 focus:ring-brand-forest-500/20 transition-all font-mono placeholder:text-gray-400"
             />
           </div>
@@ -97,7 +88,7 @@ export default function Header({
               type="text"
               value={shiftReportedBy}
               onChange={(e) => setShiftReportedBy(e.target.value)}
-              placeholder="e.g. John Doe"
+              placeholder="Inspector Name"
               className="w-full bg-brand-beige-50 hover:bg-white text-gray-800 text-sm font-medium border border-brand-beige-200 rounded-lg px-3 py-2.5 outline-hidden focus:border-brand-forest-500 focus:ring-1 focus:ring-brand-forest-500/20 transition-all placeholder:text-gray-400"
             />
           </div>
