@@ -1,66 +1,63 @@
-# Daily QC Defect Log — Docker App
+# Daily QC Defect Log — Full-Stack Woodshop App
 
-A Quality Control defect tallying app designed for woodshop inspection, real-time defect tracking, shift auditing, and containerized deployment.
+A Quality Control defect tallying app designed for woodshop inspection, real-time defect tracking, shift auditing, user authentication, and containerized deployment with an embedded server database on a Raspberry Pi.
 
 ---
 
-## 🐳 Lightweight Docker Container
+## 🔒 User Accounts & Authentication
 
-This repository is fully containerized as an ultra-lightweight, production-ready Docker image (~25MB total footprint) using a multi-stage build:
-- **Build Stage**: Compiles modern Vite/React/TypeScript assets with `node:22-alpine`.
-- **Runtime Stage**: Serves optimized static assets using `nginx:alpine-slim` with gzip compression, long-term asset caching, security headers, SPA client-side routing fallback, and native `/healthz` healthchecks.
-- **Resource Footprint**: Starts in <100ms and consumes <15MB RAM at runtime.
+The app includes full-stack authentication designed for shop-floor tablets and laptops running over Tailscale or local Wi-Fi:
 
-### Quick Start with Docker Compose:
+- **Quick User Switching**: Operators can switch between inspector profiles with a single click and a 4-digit PIN.
+- **Roles**:
+  - `admin`: Full control to add user accounts, change PINs, and manage rosters.
+  - `lead`: Lead inspector credentials with auditing privileges.
+  - `inspector`: Floor defect tallying and report submission.
+- **Default Seed Accounts**:
+  - **Admin**: Username: `admin` | Default PIN: `1234`
+  - **Lead**: Username: `lead` | Default PIN: `4321`
+  - **Inspector**: Username: `inspector` | Default PIN: `0000`
 
-You can change the external host port by either setting `HOST_PORT` inline or in a `.env` file:
-```bash
-# Run on any available port (e.g., 8080, 8088, 3000)
-HOST_PORT=8080 docker compose up -d --build
-```
-The app will be live at `http://localhost:8080` (or `http://<tailscale-ip>:8080`).
+---
 
-To view logs or stop the container:
-```bash
-docker compose logs -f
-docker compose down
-```
+## 💾 Server Database & Volume Persistence
 
-### Quick Start with Docker CLI:
-```bash
-# 1. Build the lightweight image
-docker build -t daily-qc-defect-log .
+The database runs directly on your server/Raspberry Pi (`/app/data/qc_store.json`), mounted via a Docker volume to `./data/` on the host:
+- **No separate DB containers** (PostgreSQL/MySQL) eating up Pi memory.
+- **Atomic file writes** preventing corruption during unexpected power cuts.
+- **Instant Backups**: To back up your logs and users, copy `./data/qc_store.json`.
+- **Automatic Migration**: Any existing audits saved in browser `localStorage` automatically sync to the server database upon first load.
 
-# 2. Run the container on any port you choose (e.g. 8080 instead of 3000)
-docker run -d -p 8080:80 --name qc-defect-log daily-qc-defect-log
+---
 
-# 3. Check health status
-curl http://localhost:8080/healthz
-```
+## 🐳 Quick Start with Docker Compose (Raspberry Pi / Server)
 
-Or using the npm script shortcuts:
-```bash
-npm run docker:build
-npm run docker:run
-npm run docker:stop
-```
+1. **Start the container**:
+   ```bash
+   HOST_PORT=8084 docker compose up -d --build
+   ```
+2. **Access the application**:
+   - Local: `http://localhost:8084`
+   - Tailscale: `http://<pi-tailscale-ip>:8084` or `https://<pi-node-name>.ts.net:8084`
+   - Tailscale Funnel (Public): `https://<your-funnel-subdomain>.ts.net`
 
-### Dynamic Port Configuration & Cloud Deployments:
-The Dockerfile includes dynamic port substitution via the `PORT` environment variable, making it directly compatible with Google Cloud Run, AWS ECS/Fargate, Azure Container Apps, or Kubernetes:
-```bash
-# Run on custom port (e.g. 8080)
-docker run -d -e PORT=8080 -p 8080:8080 daily-qc-defect-log
-```
+3. **View logs or stop**:
+   ```bash
+   docker compose logs -f
+   docker compose down
+   ```
 
 ---
 
 ## 💻 Local Development
 
 ```bash
-# Start Vite development server locally
+# Run full-stack dev server (Vite + Express API on port 3000)
 npm run dev
 
-# Production build test
+# Lint check
+npm run lint
+
+# Production build verification
 npm run build
 ```
-

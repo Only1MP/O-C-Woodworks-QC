@@ -8,6 +8,7 @@ interface ShareReportModalProps {
   log: QCDefectLog;
   userEmail?: string;
   showNotification: (type: 'success' | 'info' | 'error', message: string) => void;
+  onEmailTriggered?: () => void;
 }
 
 // Generate the standard spreadsheet CSV string
@@ -151,7 +152,8 @@ export default function ShareReportModal({
   onClose,
   log,
   userEmail = '',
-  showNotification
+  showNotification,
+  onEmailTriggered
 }: ShareReportModalProps) {
   const [recipient, setRecipient] = useState(userEmail);
   const [subject, setSubject] = useState(`[ShopPulse] QC Defect Log for ${log.sku} - ${log.date}`);
@@ -186,6 +188,7 @@ export default function ShareReportModal({
     navigator.clipboard.writeText(emailBody);
     setCopied(true);
     showNotification('success', 'Email body copied to clipboard.');
+    if (onEmailTriggered) onEmailTriggered();
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -198,6 +201,7 @@ export default function ShareReportModal({
     // Attempt client launch
     window.location.href = mailtoUrl;
     showNotification('info', 'Opening your default mail application...');
+    if (onEmailTriggered) onEmailTriggered();
   };
 
   return (

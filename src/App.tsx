@@ -1,94 +1,47 @@
-import React, { useState, useEffect } from 'react';
-import { STANDARD_PARTS, DEFECT_TYPES_LIST, DefectMatrix, QCDefectLog, createEmptyMatrix, createEmptyKitBins, Part, DefectType, ProductionLineState } from './types';
+import React, { useState, useEffect, useCallback } from 'react';
+import { STANDARD_PARTS, DEFECT_TYPES_LIST, DefectMatrix, QCDefectLog, createEmptyMatrix, createEmptyKitBins, ProductionLineState } from './types';
 import Header from './components/Header';
 import DefectMatrixTable from './components/DefectMatrixTable';
 import DefectHistory from './components/DefectHistory';
 import ShareReportModal from './components/ShareReportModal';
+import { AuthModal } from './components/AuthModal';
+import { qcApi, AuthUser, PublicUser } from './services/api';
 import { 
   Clipboard, 
   History, 
   Save, 
   FileText, 
   Share2, 
-  Users
+  Users,
+  User,
+  Shield,
+  Server,
+  Archive,
+  RotateCcw,
+  CheckCircle,
+  X,
+  Mail
 } from 'lucide-react';
 import ProductionForce from './components/ProductionForce';
 
 const LOCAL_STORAGE_KEY = 'shop_pulse_qc_defect_logs';
 
-function getInitialLogs(): QCDefectLog[] {
-  // Try loading from localStorage
-  try {
-    const serialized = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (serialized) {
-      const parsed = JSON.parse(serialized);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-    }
-  } catch (err) {
-    console.warn('Failed to load local storage logs', err);
-  }
-
-  return [];
-}
-
 export default function App() {
   const [activeTab, setActiveTab] = useState<'tally' | 'history' | 'positions'>('tally');
-  const [logs, setLogs] = useState<QCDefectLog[]>(getInitialLogs);
+  const [logs, setLogs] = useState<QCDefectLog[]>([]);
+  const [isServerSynced, setIsServerSynced] = useState<boolean>(true);
 
-  const [productionForce, setProductionForce] = useState<ProductionLineState>(() => {
-    try {
-      const stored = localStorage.getItem('shop_pulse_production_force');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed && Array.isArray(parsed.employees)) {
-          const morning = parsed.morning || parsed.assignments || {
-            Sides: ['', ''],
-            Crates: ['', ''],
-            Bottoms: ['', ''],
-            Lids: ['', '']
-          };
-          const afternoon = parsed.afternoon || {
-            Sides: ['', ''],
-            Crates: ['', ''],
-            Bottoms: ['', ''],
-            Lids: ['', '']
-          };
-          return {
-            employees: parsed.employees,
-            morning,
-            afternoon
-          };
-        }
-      }
-    } catch (err) {
-      console.warn('Failed to load local storage production force', err);
-    }
-    return {
-      employees: [],
-      morning: {
-        Sides: ['', ''],
-        Crates: ['', ''],
-        Bottoms: ['', ''],
-        Lids: ['', '']
-      },
-      afternoon: {
-        Sides: ['', ''],
-        Crates: ['', ''],
-        Bottoms: ['', ''],
-        Lids: ['', '']
-      }
-    };
+  // Auth state
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [publicUsers, setPublicUsers] = useState<PublicUser[]>([]);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+
+  // Production force state
+  const [productionForce, setProductionForce] = useState<ProductionLineState>({
+    employees: [],
+    morning: { Sides: ['', ''], Crates: ['', ''], Bottoms: ['', ''], Lids: ['', ''] },
+    afternoon: { Sides: ['', ''], Crates: ['', ''], Bottoms: ['', ''], Lids: ['', ''] }
   });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('shop_pulse_production_force', JSON.stringify(productionForce));
-    } catch (err) {
-      console.warn('Failed to save production force', err);
-    }
-  }, [productionForce]);
 
   // Active form state variables (mirrors a single daily sheet checklist)
   const [date, setDate] = useState<string>(() => {
@@ -102,6 +55,7 @@ export default function App() {
     const dd = String(today.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   });
+
   const [sku, setSku] = useState<string>(() => {
     try {
       const stored = localStorage.getItem('shop_pulse_active_sku');
@@ -109,6 +63,7 @@ export default function App() {
     } catch (_) {}
     return '';
   });
+
   const [shiftReportedBy, setShiftReportedBy] = useState<string>(() => {
     try {
       const stored = localStorage.getItem('shop_pulse_active_reported_by');
@@ -116,6 +71,7 @@ export default function App() {
     } catch (_) {}
     return '';
   });
+
   const [matrix, setMatrix] = useState<DefectMatrix>(() => {
     try {
       const stored = localStorage.getItem('shop_pulse_active_matrix');
@@ -126,6 +82,7 @@ export default function App() {
     } catch (_) {}
     return createEmptyMatrix();
   });
+
   const [kitBins, setKitBins] = useState<Record<string, boolean>>(() => {
     try {
       const stored = localStorage.getItem('shop_pulse_active_kit_bins');
@@ -136,6 +93,7 @@ export default function App() {
     } catch (_) {}
     return createEmptyKitBins();
   });
+
   const [additionalNotes, setAdditionalNotes] = useState<string>(() => {
     try {
       const stored = localStorage.getItem('shop_pulse_active_additional_notes');
@@ -146,7 +104,102 @@ export default function App() {
 
   // Track currently shared sheet report (or null)
   const [shareModalLog, setShareModalLog] = useState<QCDefectLog | null>(null);
-  
+
+  // Track post-email archive prompt state
+  const [emailTriggeredInModal, setEmailTriggeredInModal] = useState<boolean>(false);
+  const [showArchivePrompt, setShowArchivePrompt] = useState<boolean>(false);
+
+  // Status Notification Toast
+  const [notification, setNotification] = useState<{ type: 'success' | 'info' | 'error'; message: string } | null>(null);
+
+  const showNotification = useCallback((type: 'success' | 'info' | 'error', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => {
+      setNotification(null);
+    }, 4500);
+  }, []);
+
+  // Refresh user directory list
+  const refreshUsers = useCallback(async () => {
+    try {
+      const users = await qcApi.getPublicUsers();
+      setPublicUsers(users);
+    } catch (err) {
+      console.warn('Failed to fetch public users list', err);
+    }
+  }, []);
+
+  // Initial sync: fetch currentUser, publicUsers, logs, and staff roster
+  useEffect(() => {
+    async function initData() {
+      try {
+        // 1. Fetch current session
+        const user = await qcApi.getCurrentUser();
+        if (user) {
+          setCurrentUser(user);
+          // If inspector input is empty, prefill with user name
+          setShiftReportedBy((prev) => prev || user.displayName);
+        }
+
+        // 2. Fetch public user accounts
+        await refreshUsers();
+
+        // 3. Fetch server logs
+        const serverLogs = await qcApi.getLogs();
+        if (Array.isArray(serverLogs) && serverLogs.length > 0) {
+          setLogs(serverLogs);
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(serverLogs));
+        } else {
+          // If server is brand new, check if we have offline/localStorage logs to migrate
+          const localSaved = localStorage.getItem(LOCAL_STORAGE_KEY);
+          if (localSaved) {
+            try {
+              const parsed = JSON.parse(localSaved);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                setLogs(parsed);
+                // Background sync to server
+                qcApi.bulkImportLogs(parsed).catch(console.warn);
+              }
+            } catch (_) {}
+          }
+        }
+
+        // 4. Fetch server staff positions
+        const serverStaff = await qcApi.getStaff();
+        if (serverStaff && Array.isArray(serverStaff.employees)) {
+          setProductionForce(serverStaff);
+          localStorage.setItem('shop_pulse_production_force', JSON.stringify(serverStaff));
+        }
+
+        setIsServerSynced(true);
+      } catch (err) {
+        console.warn('Could not connect to server database, operating in offline fallback mode:', err);
+        setIsServerSynced(false);
+
+        // Fallback to local storage
+        try {
+          const localLogs = localStorage.getItem(LOCAL_STORAGE_KEY);
+          if (localLogs) setLogs(JSON.parse(localLogs));
+          const localStaff = localStorage.getItem('shop_pulse_production_force');
+          if (localStaff) setProductionForce(JSON.parse(localStaff));
+        } catch (_) {}
+      }
+    }
+
+    initData();
+  }, [refreshUsers]);
+
+  // When currentUser changes, sync inspector field if appropriate
+  const handleUserChanged = (user: AuthUser | null) => {
+    setCurrentUser(user);
+    if (user) {
+      setShiftReportedBy(user.displayName);
+      showNotification('success', `Signed in as ${user.displayName}`);
+    } else {
+      showNotification('info', 'Logged out.');
+    }
+  };
+
   // Save active sheet draft progress in real time to local storage
   useEffect(() => {
     try {
@@ -160,75 +213,87 @@ export default function App() {
       console.warn('Failed to save active sheet draft', err);
     }
   }, [date, sku, shiftReportedBy, matrix, kitBins, additionalNotes]);
-  
-  // Inline feedback state
-  const [notification, setNotification] = useState<{ type: 'success' | 'info' | 'error'; message: string } | null>(null);
 
-  // Auto clear notifications
-  useEffect(() => {
-    if (notification) {
-      const timer = setTimeout(() => {
-        setNotification(null);
-      }, 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [notification]);
-
-  const showNotification = (type: 'success' | 'info' | 'error', message: string) => {
-    setNotification({ type, message });
-  };
-
-  const handleUpdateCell = (part: Part, defect: DefectType, value: number) => {
-    setMatrix((prev) => {
-      const copy = { ...prev };
-      if (!copy[part]) copy[part] = {};
-      copy[part][defect] = value;
-      return copy;
+  // Save productionForce to server when altered
+  const handleUpdateProductionForce = (updater: React.SetStateAction<ProductionLineState>) => {
+    setProductionForce((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      // Persist locally
+      try {
+        localStorage.setItem('shop_pulse_production_force', JSON.stringify(next));
+      } catch (_) {}
+      // Sync to server database
+      qcApi.saveStaff(next).catch((err) => {
+        console.warn('Staff auto-save to server failed, stored locally:', err);
+      });
+      return next;
     });
   };
 
-  const handleUpdateKitBin = (part: Part, checked: boolean) => {
-    setKitBins((prev) => ({
+  const handleCellChange = (part: string, defect: string, delta: number) => {
+    setMatrix(prev => {
+      const current = prev[part]?.[defect] || 0;
+      const nextValue = Math.max(0, current + delta);
+      return {
+        ...prev,
+        [part]: {
+          ...prev[part],
+          [defect]: nextValue
+        }
+      };
+    });
+  };
+
+  const handleSetCellValue = (part: string, defect: string, val: number) => {
+    const cleanVal = Math.max(0, isNaN(val) ? 0 : val);
+    setMatrix(prev => ({
       ...prev,
-      [part]: checked
+      [part]: {
+        ...prev[part],
+        [defect]: cleanVal
+      }
     }));
   };
 
-  const handleResetMatrix = () => {
-    setMatrix(createEmptyMatrix());
-    setKitBins(createEmptyKitBins());
-    showNotification('info', 'Tally board reset to zero counts.');
+  const handleToggleKitBin = (part: string) => {
+    setKitBins(prev => ({
+      ...prev,
+      [part]: !prev[part]
+    }));
   };
 
-  const handleClearAllLogs = () => {
-    setLogs([]);
-    try {
-      localStorage.removeItem(LOCAL_STORAGE_KEY);
-    } catch (err) {
-      console.warn('Failed to clear local storage logs', err);
+  const handleResetCurrentAudit = () => {
+    if (window.confirm('Are you sure you want to clear current tally counts and notes for this sheet?')) {
+      setMatrix(createEmptyMatrix());
+      setKitBins(createEmptyKitBins());
+      setAdditionalNotes('');
+      showNotification('info', 'Active tally sheet reset.');
     }
-    showNotification('success', 'All past logs have been successfully cleared.');
   };
 
-  const handleSaveLog = () => {
+  const calculateGrandTotal = () => {
+    let sum = 0;
+    for (const part of STANDARD_PARTS) {
+      for (const defect of DEFECT_TYPES_LIST) {
+        sum += matrix[part]?.[defect] || 0;
+      }
+    }
+    return sum;
+  };
+
+  const grandTotal = calculateGrandTotal();
+
+  const handleSaveAudit = async () => {
     if (!sku.trim()) {
-      showNotification('error', 'Product SKU is required before saving daily sheets.');
+      showNotification('error', 'Product SKU is required before finalizing log.');
       return;
     }
 
-    // Check if there are actual defects logged. If 0, double check with visual alert
-    let grandTotal = 0;
-    for (const part of STANDARD_PARTS) {
-      for (const defect of DEFECT_TYPES_LIST) {
-        grandTotal += matrix[part]?.[defect] || 0;
-      }
-    }
-
     const newLog: QCDefectLog = {
-      id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      date,
+      id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      date: date || new Date().toISOString().split('T')[0],
       sku: sku.trim().toUpperCase(),
-      shiftReportedBy: shiftReportedBy.trim() || 'Unassigned Operator',
+      shiftReportedBy: shiftReportedBy.trim() || currentUser?.displayName || 'Inspector',
       matrix: JSON.parse(JSON.stringify(matrix)),
       kitBins: JSON.parse(JSON.stringify(kitBins)),
       additionalNotes: additionalNotes.trim(),
@@ -239,21 +304,31 @@ export default function App() {
       }
     };
 
+    // Optimistically update UI
     const updatedLogs = [newLog, ...logs];
     setLogs(updatedLogs);
 
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedLogs));
-    } catch (err) {
-      console.warn('LocalStorage save failed', err);
+    } catch (_) {}
+
+    // Save to Raspberry Pi Server Database
+    try {
+      await qcApi.saveLog(newLog);
+      setIsServerSynced(true);
+      showNotification(
+        'success',
+        `Log for SKU ${newLog.sku} saved to Raspberry Pi Database! (${grandTotal} defects)`
+      );
+    } catch (err: any) {
+      console.warn('Server database save error, preserved locally:', err);
+      showNotification(
+        'info',
+        `Log saved locally (${grandTotal} defects). Will sync when server is reachable.`
+      );
     }
 
-    showNotification(
-      'success',
-      `Log with SKU ${newLog.sku} successfully saved. Saved ${grandTotal} tallied points!`
-    );
-
-    // Auto navigate to History page so they can review what was logged!
+    // Auto navigate to History page so they can review what was logged
     setActiveTab('history');
 
     // Reset contemporary entries for the next audit
@@ -262,18 +337,22 @@ export default function App() {
     setAdditionalNotes('');
   };
 
-  const handleDeleteLog = (id: string) => {
+  const handleDeleteLog = async (id: string) => {
     const updated = logs.filter(log => log.id !== id);
     setLogs(updated);
+
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
-    } catch (err) {
-      console.error(err);
+    } catch (_) {}
+
+    try {
+      await qcApi.deleteLog(id);
+      showNotification('info', 'Quality Control log removed from server database.');
+    } catch (err: any) {
+      showNotification('info', err.message || 'Log removed locally.');
     }
-    showNotification('info', 'Quality Control log removed.');
   };
 
-  // Restore past log into editor so users can review or append entries
   const handleLoadLogToActive = (log: QCDefectLog) => {
     setDate(log.date);
     setSku(log.sku);
@@ -291,10 +370,10 @@ export default function App() {
       return;
     }
     const activeLogObject: QCDefectLog = {
-      id: 'active-draft',
-      date,
+      id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      date: date || new Date().toISOString().split('T')[0],
       sku: sku.trim().toUpperCase(),
-      shiftReportedBy: shiftReportedBy.trim() || 'Operator',
+      shiftReportedBy: shiftReportedBy.trim() || currentUser?.displayName || 'Inspector',
       matrix: JSON.parse(JSON.stringify(matrix)),
       kitBins: JSON.parse(JSON.stringify(kitBins)),
       additionalNotes: additionalNotes.trim(),
@@ -304,7 +383,30 @@ export default function App() {
         afternoon: JSON.parse(JSON.stringify(productionForce.afternoon))
       }
     };
+    setEmailTriggeredInModal(false);
     setShareModalLog(activeLogObject);
+  };
+
+  const handleCloseShareModal = () => {
+    const wasEmailTriggered = emailTriggeredInModal;
+    setShareModalLog(null);
+    setEmailTriggeredInModal(false);
+
+    // If an email draft was initiated or copied, immediately prompt to Archive & Clear Grid!
+    if (wasEmailTriggered) {
+      setShowArchivePrompt(true);
+    }
+  };
+
+  const handleConfirmArchiveAndClear = async () => {
+    setShowArchivePrompt(false);
+    await handleSaveAudit();
+    showNotification('success', 'Session archived to database and grid cleared for next run!');
+  };
+
+  const handleDismissArchivePrompt = () => {
+    setShowArchivePrompt(false);
+    showNotification('info', 'Grid retained without archiving.');
   };
 
   return (
@@ -335,8 +437,11 @@ export default function App() {
                 referrerPolicy="no-referrer"
               />
               <div className="flex flex-col">
-                <span className="font-mono text-[10px] text-brand-beige-300 font-semibold leading-none tracking-wider uppercase">
+                <span className="font-mono text-[10px] text-brand-beige-300 font-semibold leading-none tracking-wider uppercase flex items-center gap-1.5">
                   Daily QC Log Ledger
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-black/20 text-[9px] text-emerald-300 font-mono" title="Connected to Server Database">
+                    <Server className="w-2.5 h-2.5" /> Pi DB
+                  </span>
                 </span>
                 <span className="text-xs sm:text-sm font-bold tracking-tight text-white leading-tight">
                   ShopPulse • Olive &amp; Cocoa
@@ -384,6 +489,29 @@ export default function App() {
                 <History className="w-3.5 h-3.5" />
                 <span>Audits ({logs.length})</span>
               </button>
+
+              {/* User Account / Sign In Pill */}
+              <button
+                onClick={() => setIsAuthModalOpen(true)}
+                className={`flex items-center gap-1.5 text-[11px] sm:text-xs font-semibold px-3 py-2 sm:py-2.5 rounded-lg transition-all border ${
+                  currentUser
+                    ? 'bg-brand-forest-800 text-emerald-300 border-emerald-500/30 hover:bg-brand-forest-900'
+                    : 'bg-white/10 text-brand-beige-200 border-white/20 hover:bg-white/20'
+                }`}
+                title="Manage User Account & Authentication"
+              >
+                {currentUser ? (
+                  <>
+                    <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="max-w-[100px] truncate">{currentUser.displayName}</span>
+                  </>
+                ) : (
+                  <>
+                    <User className="w-3.5 h-3.5" />
+                    <span>Sign In</span>
+                  </>
+                )}
+              </button>
             </div>
 
           </div>
@@ -409,145 +537,151 @@ export default function App() {
             <DefectMatrixTable
               matrix={matrix}
               kitBins={kitBins}
-              updateCell={handleUpdateCell}
-              updateKitBin={handleUpdateKitBin}
-              resetMatrix={handleResetMatrix}
+              updateCell={(part, defect, value) => handleSetCellValue(part, defect, value)}
+              updateKitBin={(part, checked) => setKitBins(prev => ({ ...prev, [part]: checked }))}
+              resetMatrix={handleResetCurrentAudit}
             />
 
-            {/* Clipboard footer - Additional Notes and Submit control card */}
-            <div className="bg-white border border-brand-beige-200 rounded-xl p-6 shadow-xs">
-              <div className="flex flex-col md:flex-row gap-6 justify-between items-start">
-                
-                {/* Notes area */}
-                <div className="w-full md:max-w-xl flex flex-col gap-2">
-                  <label htmlFor="additional-notes" className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
-                    <FileText className="w-4 h-4 text-brand-forest-600" />
-                    <span>Additional Inspection Notes (Optional)</span>
-                  </label>
-                  <textarea
-                    id="additional-notes"
-                    value={additionalNotes}
-                    onChange={(e) => setAdditionalNotes(e.target.value)}
-                    placeholder="Describe machinery issues, wood fiber imperfections, blade wear, humidity conditions, supplier issues, or actions taken..."
-                    rows={4}
-                    className="w-full bg-brand-beige-50 border border-brand-beige-200 rounded-lg p-3 text-xs outline-hidden focus:ring-1 focus:ring-brand-forest-500/20 focus:border-brand-forest-500 placeholder:text-gray-400"
-                  />
-                  <p className="text-[10px] text-gray-400 italic">
-                    Logged notes are archived securely and support search/analytics breakdowns later.
-                  </p>
-                </div>
-
-                {/* Submit log trigger card */}
-                <div className="w-full md:w-85 bg-brand-beige-50 rounded-xl p-4 border border-brand-beige-200 flex flex-col justify-between h-full min-h-[170px] gap-3">
-                  <div>
-                    <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider font-mono mb-1">
-                      Finalize Daily Session
-                    </h4>
-                    <p className="text-[11px] text-gray-500 font-sans mb-1 leading-relaxed">
-                      Archive shift matrix to history logbook, or export/email spreadsheet summaries on-the-fly.
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <button
-                      id="save-log-btn"
-                      onClick={handleSaveLog}
-                      className="w-full py-2.5 bg-brand-forest-600 hover:bg-brand-forest-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer group"
-                    >
-                      <Save className="w-4 h-4 text-brand-beige-300 group-hover:scale-110 transition-transform font-bold" />
-                      <span>Archive Entry &amp; Clear Grid</span>
-                    </button>
-
-                    <button
-                      id="share-active-btn"
-                      onClick={handleShareActiveDraft}
-                      className="w-full py-2 bg-brand-beige-100 hover:bg-brand-beige-200 text-brand-beige-900 border border-brand-beige-300 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-3xs"
-                    >
-                      <Share2 className="w-4 h-4 text-brand-forest-600 animate-pulse font-bold" />
-                      <span>Export &amp; Email Draft</span>
-                    </button>
-                  </div>
-                </div>
-
+            {/* Bottom Actions, Qualitative Notes and Confirmation submission */}
+            <div className="bg-white border border-brand-beige-200 rounded-xl p-6 shadow-xs flex flex-col md:flex-row gap-6 items-stretch justify-between">
+              
+              <div className="flex-1 flex flex-col gap-2">
+                <label htmlFor="notes" className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-brand-forest-600" />
+                  Inspector Shift Observations &amp; Scrap Rationale
+                </label>
+                <textarea
+                  id="notes"
+                  rows={3}
+                  value={additionalNotes}
+                  onChange={(e) => setAdditionalNotes(e.target.value)}
+                  placeholder="Note specific pallet tags, saw misalignments, lumber grain anomalies, or corrective actions taken on the floor..."
+                  className="w-full bg-brand-beige-50 border border-brand-beige-200 rounded-lg p-3 text-sm text-gray-800 placeholder:text-gray-400 outline-hidden focus:border-brand-forest-500 focus:ring-1 focus:ring-brand-forest-500/20 font-sans resize-none"
+                />
               </div>
+
+              <div className="flex flex-col justify-end gap-3 min-w-[240px]">
+                <div className="bg-brand-beige-50 border border-brand-beige-200 rounded-lg p-3 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Sheet Total</span>
+                  <span className={`text-xl font-bold font-mono ${grandTotal > 0 ? 'text-brand-forest-600' : 'text-gray-400'}`}>
+                    {grandTotal} <span className="text-xs font-normal text-gray-500">defects</span>
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleResetCurrentAudit}
+                    className="py-2.5 px-3 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 text-xs font-semibold transition-colors"
+                  >
+                    Clear Sheet
+                  </button>
+
+                  <button
+                    id="export-email-draft-btn"
+                    onClick={handleShareActiveDraft}
+                    className="flex-1 py-2.5 px-4 rounded-lg bg-brand-forest-600 hover:bg-brand-forest-700 text-white font-semibold text-sm shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Mail className="w-4 h-4 text-amber-300" />
+                    <span>Export &amp; Email Draft</span>
+                  </button>
+                </div>
+              </div>
+
             </div>
           </div>
         )}
 
-        {/* Historics audits ledger screen */}
+        {activeTab === 'positions' && (
+          <ProductionForce
+            productionForce={productionForce}
+            setProductionForce={handleUpdateProductionForce}
+          />
+        )}
+
         {activeTab === 'history' && (
           <DefectHistory
             logs={logs}
             deleteLog={handleDeleteLog}
             loadLogToActive={handleLoadLogToActive}
             shareLog={(log) => setShareModalLog(log)}
-            clearAllLogs={handleClearAllLogs}
-          />
-        )}
-
-        {/* Labor positioning board / operator setup view */}
-        {activeTab === 'positions' && (
-          <ProductionForce 
-            productionForce={productionForce}
-            setProductionForce={setProductionForce}
           />
         )}
 
       </main>
 
-      {/* Reusable Share/Email Inspection Report Modal */}
+      {/* Share / Export Modal Dialog */}
       {shareModalLog && (
         <ShareReportModal
-          isOpen={true}
-          onClose={() => setShareModalLog(null)}
+          isOpen={Boolean(shareModalLog)}
+          onClose={handleCloseShareModal}
           log={shareModalLog}
           showNotification={showNotification}
+          onEmailTriggered={() => setEmailTriggeredInModal(true)}
         />
       )}
 
-      {/* Mobile Bottom Navigation Bar */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-brand-forest-900/95 backdrop-blur-md border-t border-brand-forest-700/80 px-2 py-1.5 shadow-lg flex items-center justify-around">
-        <button
-          onClick={() => setActiveTab('tally')}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[10px] font-bold transition-all ${
-            activeTab === 'tally'
-              ? 'text-amber-300 bg-brand-forest-800'
-              : 'text-brand-beige-200 hover:text-white'
-          }`}
-        >
-          <Clipboard className="w-4 h-4" />
-          <span>Tally Sheet</span>
-        </button>
+      {/* Archive & Clear Grid Post-Export Confirmation Modal */}
+      {showArchivePrompt && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-brand-beige-200 overflow-hidden w-full max-w-md flex flex-col loader-fade-in">
+            {/* Modal Header */}
+            <div className="bg-brand-forest-750 text-white p-5 flex items-center justify-between border-b border-brand-forest-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-emerald-500/20 text-emerald-300 rounded-lg">
+                  <CheckCircle className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm tracking-tight">Email Sent / Drafted</h3>
+                  <p className="text-[11px] text-brand-beige-300">Complete Session Workflow</p>
+                </div>
+              </div>
+              <button
+                onClick={handleDismissArchivePrompt}
+                className="text-brand-beige-300 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
-        <button
-          onClick={() => setActiveTab('positions')}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[10px] font-bold transition-all ${
-            activeTab === 'positions'
-              ? 'text-amber-300 bg-brand-forest-800'
-              : 'text-brand-beige-200 hover:text-white'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span>Positions</span>
-        </button>
+            {/* Modal Body */}
+            <div className="p-6 flex flex-col gap-4">
+              <div className="bg-brand-beige-50 border border-brand-beige-200 rounded-xl p-4 flex items-center gap-3">
+                <Archive className="w-5 h-5 text-brand-forest-600 shrink-0" />
+                <div className="text-sm font-semibold text-gray-800">
+                  Archive Entry &amp; Clear Grid?
+                </div>
+              </div>
+            </div>
 
-        <button
-          onClick={() => setActiveTab('history')}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[10px] font-bold transition-all ${
-            activeTab === 'history'
-              ? 'text-amber-300 bg-brand-forest-800'
-              : 'text-brand-beige-200 hover:text-white'
-          }`}
-        >
-          <History className="w-4 h-4" />
-          <span>Audits ({logs.length})</span>
-        </button>
-      </div>
+            {/* Modal Actions */}
+            <div className="bg-brand-beige-100/70 p-4 border-t border-brand-beige-200 flex items-center justify-end gap-2.5">
+              <button
+                onClick={handleDismissArchivePrompt}
+                className="px-3.5 py-2 rounded-xl border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-semibold transition-colors"
+              >
+                Keep Grid Active
+              </button>
+              <button
+                onClick={handleConfirmArchiveAndClear}
+                className="px-4 py-2 rounded-xl bg-brand-forest-600 hover:bg-brand-forest-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+              >
+                <Archive className="w-3.5 h-3.5 text-amber-300" />
+                <span>Archive &amp; Clear Grid</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* Minimal Footer */}
-      <footer className="text-center mt-12 mb-16 md:mb-4 text-xs text-gray-400 px-4">
-        <p>&copy; {new Date().getFullYear()} Daily QC Defect Log</p>
-      </footer>
+      {/* User Accounts & PIN Auth Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        currentUser={currentUser}
+        publicUsers={publicUsers}
+        onUserChanged={handleUserChanged}
+        onUsersRefreshed={refreshUsers}
+      />
 
     </div>
   );

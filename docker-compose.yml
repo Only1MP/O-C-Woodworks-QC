@@ -7,10 +7,17 @@ services:
     container_name: daily-qc-defect-log
     restart: unless-stopped
     ports:
-      # Map host port 3000 to container port 80 (customizable via HOST_PORT env var)
-      - "${HOST_PORT:-3000}:80"
+      # Map host port 8084 or custom HOST_PORT to container web port 80
+      - "${HOST_PORT:-8084}:80"
     environment:
       - PORT=80
+      - NODE_ENV=production
+      - DATA_DIR=/app/data
+      - DATABASE_PATH=/app/data/qc_store.json
+      - JWT_SECRET=woodshop-qc-tailscale-secure-key-9921
+    volumes:
+      # Persistent host volume: database & user accounts survive container restarts and rebuilds
+      - ./data:/app/data
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:80/healthz"]
       interval: 30s
