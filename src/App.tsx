@@ -555,14 +555,14 @@ export default function App() {
               <div className="flex-1 flex flex-col gap-2">
                 <label htmlFor="notes" className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
                   <FileText className="w-4 h-4 text-brand-forest-600" />
-                  Inspector Shift Observations &amp; Scrap Rationale
+                  Additional Notes (Optional)
                 </label>
                 <textarea
                   id="notes"
                   rows={3}
                   value={additionalNotes}
                   onChange={(e) => setAdditionalNotes(e.target.value)}
-                  placeholder="Note specific pallet tags, saw misalignments, lumber grain anomalies, or corrective actions taken on the floor..."
+                  placeholder=""
                   className="w-full bg-brand-beige-50 border border-brand-beige-200 rounded-lg p-3 text-sm text-gray-800 placeholder:text-gray-400 outline-hidden focus:border-brand-forest-500 focus:ring-1 focus:ring-brand-forest-500/20 font-sans resize-none"
                 />
               </div>
