@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { QCDefectLog, STANDARD_PARTS, DEFECT_TYPES_LIST } from '../types';
-import { Mail, Download, Clipboard, Check, X, ArrowRight } from 'lucide-react';
+import { Mail, Download, Clipboard, Check, X, ArrowRight, ExternalLink } from 'lucide-react';
+import { openArchivedLogWindow } from '../utils/openArchivedLogWindow';
 
 interface ShareReportModalProps {
   isOpen: boolean;
@@ -217,13 +218,31 @@ export default function ShareReportModal({
               <h3 className="font-bold text-sm tracking-tight font-sans">Export &amp; Share QC Record</h3>
             </div>
           </div>
-          <button
-            id="close-share-modal-btn"
-            onClick={onClose}
-            className="text-white hover:text-amber-300 bg-brand-forest-800 hover:bg-brand-forest-900 rounded-full p-1.5 transition-colors cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              id="open-separate-window-btn"
+              onClick={() => {
+                const opened = openArchivedLogWindow(log);
+                if (opened) {
+                  showNotification('info', 'Opened inspection record in separate window.');
+                } else {
+                  showNotification('error', 'Popup blocked. Please allow popups to open separate window.');
+                }
+              }}
+              className="text-white hover:text-amber-300 bg-brand-forest-800 hover:bg-brand-forest-900 rounded-lg p-1.5 transition-colors cursor-pointer flex items-center gap-1 text-xs font-semibold"
+              title="Open in Separate Window"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-amber-300" />
+              <span className="hidden sm:inline">Separate Window</span>
+            </button>
+            <button
+              id="close-share-modal-btn"
+              onClick={onClose}
+              className="text-white hover:text-amber-300 bg-brand-forest-800 hover:bg-brand-forest-900 rounded-full p-1.5 transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Payload Area */}
@@ -232,7 +251,7 @@ export default function ShareReportModal({
           {/* Active Record Summary Snapshot Card */}
           <div className="bg-brand-beige-50 border border-brand-beige-200 p-4 rounded-xl flex items-center justify-between gap-4">
             <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] text-gray-400 uppercase font-mono tracking-wider font-bold">DRAFT REPORT DETAILS</span>
+              <span className="text-[10px] text-gray-400 uppercase font-mono tracking-wider font-bold">RECORD DETAILS</span>
               <span className="text-sm font-bold text-gray-900">{log.sku}</span>
               <span className="text-xs text-gray-500 font-mono">Date: {log.date} · Reported By: {log.shiftReportedBy || 'Not set'}</span>
             </div>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { QCDefectLog, STANDARD_PARTS, DEFECT_TYPES_LIST } from '../types';
-import { Search, Trash2, Download, Calendar, Eye, FileSpreadsheet, Layers, Clock, Mail } from 'lucide-react';
+import { Search, Trash2, Download, Calendar, Eye, FileSpreadsheet, Layers, Clock, Mail, ExternalLink } from 'lucide-react';
+import { openArchivedLogWindow } from '../utils/openArchivedLogWindow';
 
 interface DefectHistoryProps {
   logs: QCDefectLog[];
@@ -292,6 +293,15 @@ export default function DefectHistory({
                           </button>
 
                           <button
+                            id={`history-open-window-btn-${log.id}`}
+                            onClick={() => openArchivedLogWindow(log)}
+                            className="bg-brand-forest-50 p-1.5 hover:bg-brand-forest-100 text-brand-forest-700 rounded-md transition-all font-semibold"
+                            title="Open Log in Separate Window (Re-email & Print)"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </button>
+
+                          <button
                             id={`history-share-btn-${log.id}`}
                             onClick={() => shareLog(log)}
                             className="bg-amber-55 hover:bg-amber-100 text-amber-700 p-1.5 rounded-md transition-all"
@@ -449,6 +459,15 @@ export default function DefectHistory({
               >
                 <Clock className="w-3.5 h-3.5" />
                 <span>Restore to Current Sheet</span>
+              </button>
+
+              <button
+                id="sidebar-open-window-btn"
+                onClick={() => openArchivedLogWindow(selectedLog)}
+                className="w-full py-2 bg-brand-forest-600 hover:bg-brand-forest-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-3xs"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-amber-300" />
+                <span>Open in Separate Window</span>
               </button>
 
               <button
